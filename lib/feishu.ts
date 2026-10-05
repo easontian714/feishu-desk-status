@@ -15,16 +15,17 @@ async function tokenRequest(body: Record<string, string>) {
   const appId = process.env.FEISHU_APP_ID;
   const appSecret = process.env.FEISHU_APP_SECRET;
   if (!appId || !appSecret) throw new Error("Feishu app credentials are missing");
+  const form = new URLSearchParams({
+    ...body,
+    client_id: appId,
+    client_secret: appSecret,
+  });
   const response = await fetch(`${API}/authen/v2/oauth/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      ...body,
-      client_id: appId,
-      client_secret: appSecret,
-    }),
+    body: form.toString(),
     cache: "no-store",
   });
   const data = (await response.json()) as TokenPayload & { error?: string; error_description?: string };
