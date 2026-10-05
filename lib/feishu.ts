@@ -18,10 +18,13 @@ async function tokenRequest(body: Record<string, string>) {
   const response = await fetch(`${API}/authen/v2/oauth/token`, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${appId}:${appSecret}`).toString("base64")}`,
       "Content-Type": "application/json; charset=utf-8",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      ...body,
+      client_id: appId,
+      client_secret: appSecret,
+    }),
     cache: "no-store",
   });
   const data = (await response.json()) as TokenPayload & { error?: string; error_description?: string };
