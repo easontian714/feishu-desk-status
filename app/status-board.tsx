@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DeskStatus } from "@/lib/status";
-
-type Payload = { status: DeskStatus; until: string | null; refreshedAt: string };
 
 const COPY: Record<DeskStatus, { label: string; note: string }> = {
   working: { label: "在上班", note: "可以来找我" },
@@ -12,56 +10,53 @@ const COPY: Record<DeskStatus, { label: string; note: string }> = {
   off: { label: "下班了", note: "明天见" },
 };
 
-function formatTime(value: string) {
+function londonParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    weekday: value("weekday"),
+    hour: Number(value("hour")),
+    minute: Number(value("minute")),
+  };
+}
+
+function deriveStaticStatus(date: Date): DeskStatus {
+  const { weekday, hour, minute } = londonParts(date);
+  if (weekday === "Sat" || weekday === "Sun") return "off";
+  const minutes = hour * 60 + minute;
+  if (minutes < 9 * 60 || minutes >= 21 * 60) return "off";
+  if (minutes >= 12 * 60 + 30 && minutes < 13 * 60 + 30) return "lunch";
+  return "working";
+}
+
+function formatTime(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", {
     timeZone: "Europe/London",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export default function StatusBoard() {
-  const [data, setData] = useState<Payload | null>(null);
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [stale, setStale] = useState(false);
-
-  const refresh = useCallback(async () => {
-    try {
-      const response = await fetch("/api/status", { cache: "no-store" });
-      if (response.status === 401) {
-        setAuthorized(false);
-        return;
-      }
-      if (!response.ok) throw new Error("status unavailable");
-      setData((await response.json()) as Payload);
-      setAuthorized(true);
-      setStale(false);
-    } catch {
-      setStale(true);
-    }
-  }, []);
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 60_000);
+    setNow(new Date());
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, []);
 
-  if (authorized === false) {
-    return (
-      <main className="board board-auth">
-        <section className="auth-panel" aria-labelledby="auth-title">
-          <div className="mark" aria-hidden="true">E</div>
-          <h1 id="auth-title">连接飞书日历</h1>
-          <p>只读取日程时间和忙闲状态，不展示会议内容。</p>
-          <a className="button" href="/api/auth/login">连接我的日历</a>
-        </section>
-      </main>
-    );
-  }
+  const status = useMemo(() => (now ? deriveStaticStatus(now) : null), [now]);
 
-  if (!data) {
+  if (!now || !status) {
     return (
       <main className="board board-loading" aria-label="正在读取状态">
         <div className="loading-line" />
@@ -70,24 +65,20 @@ export default function StatusBoard() {
     );
   }
 
-  const copy = COPY[data.status];
-  const note = data.status === "meeting" && data.until
-    ? `预计 ${formatTime(data.until)} 结束`
-    : copy.note;
-
+  const copy = COPY[status];
   return (
-    <main className={`board status-${data.status}`}>
+    <main className={`board status-${status}`}>
       <div className="identity">Eason</div>
       <section className="status-content" aria-live="polite">
         <div className="status-symbol" aria-hidden="true">
-          {data.status === "meeting" ? "●" : data.status === "lunch" ? "◐" : data.status === "off" ? "○" : "✓"}
+          {status === "lunch" ? "◐" : status === "off" ? "○" : "✓"}
         </div>
         <h1>{copy.label}</h1>
-        <p>{note}</p>
+        <p>{copy.note}</p>
       </section>
       <footer>
-        <span>{stale ? "暂未更新，展示最近状态" : "根据飞书日历自动更新"}</span>
-        <time dateTime={data.refreshedAt}>伦敦时间 {formatTime(data.refreshedAt)}</time>
+        <span>根据固定工作时间自动更新</span>
+        <time dateTime={now.toISOString()}>伦敦时间 {formatTime(now)}</time>
       </footer>
     </main>
   );
