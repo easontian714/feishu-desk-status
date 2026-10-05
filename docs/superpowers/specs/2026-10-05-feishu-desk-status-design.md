@@ -24,7 +24,7 @@ Cancelled events, declined invitations, unaccepted invitations, all-day events, 
 
 Initial configuration:
 
-- Working hours: Monday–Friday, 09:30–18:30
+- Working hours: Monday–Friday, 09:00–21:00
 - Lunch: 12:30–13:30
 - Calendar refresh: every 60 seconds
 
