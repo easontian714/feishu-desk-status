@@ -16,7 +16,8 @@ export async function GET(request: Request) {
   try {
     await setSession(await exchangeCode(code, `${origin}/api/auth/callback`));
     return Response.redirect(new URL("/", request.url));
-  } catch {
+  } catch (error) {
+    console.error("Feishu OAuth callback failed", error);
     return Response.redirect(new URL("/?auth=failed", request.url));
   }
 }
