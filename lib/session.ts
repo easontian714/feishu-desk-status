@@ -9,6 +9,16 @@ export type Session = {
 };
 
 const COOKIE_NAME = "desk_status_session";
+const COOKIE_CHUNK_SIZE = 3000;
+const MAX_COOKIE_CHUNKS = 4;
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 60 * 60 * 24 * 30,
+};
 
 function secretKey() {
   const secret = process.env.SESSION_SECRET;
@@ -54,22 +64,31 @@ async function decrypt(value: string): Promise<Session | null> {
 
 export async function getSession() {
   const store = await cookies();
-  const value = store.get(COOKIE_NAME)?.value;
+  const chunks = Array.from({ length: MAX_COOKIE_CHUNKS }, (_, index) =>
+    store.get(`${COOKIE_NAME}_${index}`)?.value,
+  ).filter((value): value is string => Boolean(value));
+  const value = chunks.length > 0 ? chunks.join("") : store.get(COOKIE_NAME)?.value;
   return value ? decrypt(value) : null;
 }
 
 export async function setSession(session: Session) {
   const store = await cookies();
-  store.set(COOKIE_NAME, await encrypt(session), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  const encrypted = await encrypt(session);
+  const chunks = encrypted.match(new RegExp(`.{1,${COOKIE_CHUNK_SIZE}}`, "g")) ?? [];
+  if (chunks.length > MAX_COOKIE_CHUNKS) throw new Error("Encrypted session is too large");
+  store.delete(COOKIE_NAME);
+  for (let index = 0; index < MAX_COOKIE_CHUNKS; index += 1) {
+    const name = `${COOKIE_NAME}_${index}`;
+    const value = chunks[index];
+    if (value) store.set(name, value, cookieOptions);
+    else store.delete(name);
+  }
 }
 
 export async function clearSession() {
   const store = await cookies();
   store.delete(COOKIE_NAME);
+  for (let index = 0; index < MAX_COOKIE_CHUNKS; index += 1) {
+    store.delete(`${COOKIE_NAME}_${index}`);
+  }
 }
