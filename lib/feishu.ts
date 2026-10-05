@@ -45,6 +45,10 @@ async function tokenRequest(body: Record<string, string>) {
 
 export async function exchangeCode(code: string, redirectUri: string): Promise<Session> {
   const data = await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri });
+  console.info("[oauth] token sizes:", {
+    accessToken: data.access_token.length,
+    refreshToken: data.refresh_token?.length ?? 0,
+  });
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
