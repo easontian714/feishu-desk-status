@@ -2,6 +2,7 @@ import type { CalendarEvent } from "./status";
 import { setSession, type Session } from "./session";
 
 const API = "https://open.feishu.cn/open-apis";
+const TOKEN_ENDPOINT = "https://accounts.feishu.cn/oauth/v3/token";
 
 type TokenPayload = {
   access_token: string;
@@ -20,7 +21,7 @@ async function tokenRequest(body: Record<string, string>) {
     client_id: appId,
     client_secret: appSecret,
   });
-  const response = await fetch(`${API}/authen/v2/oauth/token`, {
+  const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -28,9 +29,16 @@ async function tokenRequest(body: Record<string, string>) {
     body: form.toString(),
     cache: "no-store",
   });
-  const data = (await response.json()) as TokenPayload & { error?: string; error_description?: string };
+  const data = (await response.json()) as TokenPayload & {
+    code?: number;
+    msg?: string;
+    error?: string;
+    error_description?: string;
+  };
   if (!response.ok || !data.access_token) {
-    throw new Error(data.error_description || data.error || "Unable to obtain Feishu access token");
+    throw new Error(
+      data.error_description || data.msg || data.error || `Unable to obtain Feishu access token (${response.status})`,
+    );
   }
   return data;
 }

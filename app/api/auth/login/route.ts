@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const url = new URL("https://accounts.feishu.cn/open-apis/authen/v1/authorize");
   url.searchParams.set("app_id", appId);
   url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("scope", "calendar:calendar.event:read");
+  url.searchParams.set("scope", "calendar:calendar.event:read offline_access");
   url.searchParams.set("state", state);
   return Response.redirect(url);
 }
